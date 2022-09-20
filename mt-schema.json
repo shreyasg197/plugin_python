@@ -1,0 +1,49 @@
+{
+    "paymentsmessage": {
+		"definitions": {
+			"mt202": {
+				"type": "object",
+				"required": [
+					"id",
+					"cashflowIdList",
+					"productType"
+				],
+				"properties": {
+					"amount": {
+						"x-encrypted": {
+							"key": "AES-256",
+							"mode": "CBC"
+						},
+						"x-signed": true,
+						"type": "string"
+					},
+					"currency":  {
+						"x-signed": true,
+						"type": "string"
+					},
+					"cashflowIdList": {
+						"x-signed": true,
+						"type": "object"
+					},
+					"counterpartyId": {
+						"x-encrypted": {
+							"key": "TOK-NUM8-256",
+							"mode": "FPE"
+						},
+						"type": "string"
+					}
+				},
+				"transform": {
+					"x-encrypted": {
+						"format": "replace"
+					},
+					"x-signed": {
+						"format": "extend",
+						"key": "AES-128",
+						"label": "x-signature"
+					}
+				}
+			}
+		}
+    }
+}
