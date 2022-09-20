@@ -1,0 +1,5 @@
+---
+DEBUG : False
+NO_FILE_LOGS : False
+FLASK_LOG_PATH : "/tmp/flask.log"
+API_KEY : ""
