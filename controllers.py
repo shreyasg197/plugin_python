@@ -12,5 +12,5 @@ def parse_request(request):
         payload = request.get_json()
     else:
         payload = json.loads(request.data)
-    debug_mod(logger, payload)
-    return json.loads(base64.b64decode(payload['payload']))
+    debug_mod(logger, base64.b64decode(payload['payload']))
+    return json.loads(base64.b64decode(payload['payload'])), payload['message_type']

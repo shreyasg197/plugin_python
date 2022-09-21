@@ -36,13 +36,14 @@ def validate_config_yaml(config_yaml):
             if not "FLASK_LOG_PATH" in config_yaml:
                 raise KeyError("FLASK_LOG_PATH")
         # Validate API KEY from DSM
-        validate_api_key(config_yaml['API_KEY'])
+        # validate_api_key(config_yaml['API_KEY'])
     except KeyError as error:
         print("ERROR: Key not found in config.yaml", error)
         exit_error_process(1)
     except Exception as error:
         print("ERROR: ", error)
         exit_error_process(1)
+
 
 
     
