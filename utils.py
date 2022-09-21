@@ -2,6 +2,18 @@
 import sys
 import yaml
 
+def entered_fn(logger, function_name):
+    logger.debug("Entered function %s", str(function_name))
+
+def exit_fn(logger, function_name):
+    logger.debug("Exiting function %s", str(function_name))
+
+def debug_mod(logger, data):
+    logger.debug(data)
+
+def error__(logger, data):
+    logger.error(data)
+
 def load_config_yaml():
     try:        
         with open('config.yaml', 'r') as file:

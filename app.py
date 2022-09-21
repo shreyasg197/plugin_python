@@ -7,6 +7,7 @@ import logging
 from flask_cors import CORS
 from flask import Flask, request, make_response, jsonify, abort
 from utils import exit_error_process, validate_config_yaml, load_config_yaml
+from controllers import parse_request
 
 # Load config.yaml
 config_yaml = load_config_yaml()
@@ -57,24 +58,30 @@ CORS(app)
 @app.before_first_request
 def before_first_request():
     # something to do before the first request TBD
+    print("Starting")
 
 @app.errorhandler(404)
 def not_found_error(error):
-    return make_response(jsonify({'error': 'Resource not found'}), 404)
+    return make_response(jsonify({'ERROR': 'Resource not found'}), 404)
 
 @app.errorhandler(400)
 def illegal_request(error):
-    return make_response(jsonify({'error': 'Client issued a malformed or illegal request'}), 404)
+    return make_response(jsonify({'ERROR': 'Client issued a malformed or illegal request'}), 400)
 
 
 @app.route("/helloWorld", methods=['GET'])
 def hello():
-    entered_func("hello")
-    return dummy_func()
+    return "HelloWorld, 200"
 
 
-def dummy_func():
-    return "HelloWorld"
+@app.route("/fortanix", methods=['POST'])
+def post_handler():
+    try:
+        payload = parse_request(request)
+    except KeyError:
+        abort(400)
+    return 'OK'
+
 
 if __name__ == '__main__':
     print("Starting App on port")
