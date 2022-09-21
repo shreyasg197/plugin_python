@@ -1,5 +1,8 @@
 ---
-DEBUG : False
+DEBUG : True
+PORT : "5000"
 NO_FILE_LOGS : False
 FLASK_LOG_PATH : "/tmp/flask.log"
+API_ENDPOINT : "https://apps.sdkms.fortanix.com"
 API_KEY : ""
+VERIFY_SSL : False
