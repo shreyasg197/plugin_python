@@ -1,27 +1,14 @@
 import os
-import time
-import json
-from unittest.mock import DEFAULT
-import config
-import random
 import logging
 from flask_cors import CORS
 from flask import Flask, request, make_response, jsonify, abort
-from utils import exit_error_process, validate_config_yaml, load_config_yaml
+from utils import exit_error_process, load_schema_file, validate_config_yaml, load_config_yaml,init_dsma_client, load_schema_file
 from controllers import parse_request
-
-# DSM IMPORTS
-import sdkms.v1
-
-from sdkms.v1.rest import ApiException
-from sdkms.v1.models.cipher_mode import CipherMode
-from sdkms.v1.models.object_type import ObjectType
-from sdkms.v1.models.sobject_descriptor import SobjectDescriptor
-# from sdkms.v1.models.mac_generate_request import MacGenerateRequest
-# from sdkms.v1.models.mac_verify_request import MacVerifyReques
 
 # Load config.yaml
 config_yaml = load_config_yaml()
+# Load Schema file
+SCHEMA = load_schema_file()
 # Validate if config.yaml keys are present
 validate_config_yaml(config_yaml)
 
@@ -29,8 +16,8 @@ validate_config_yaml(config_yaml)
 DEBUG = True if (os.getenv("DEBUG")=="True" or config_yaml['DEBUG'] == True) else False
 DEFAULT_PORT = 5000
 DEFAULT_API_ENDPOINT = 'https://apps.sdkms.fortanix.com'
-DEFAULT_VERIFY_SSL = True
 API_KEY = config_yaml['API_KEY']
+DSMA_PORT = config_yaml['DSMA_PORT']
 try:
     if len(str(config_yaml['PORT'])) !=0 :
         PORT = config_yaml['PORT']
@@ -47,13 +34,6 @@ except:
     API_ENDPOINT = DEFAULT_API_ENDPOINT
     print("INFO: Using default endpoint", DEFAULT_API_ENDPOINT)
 
-try:
-    if len(str(config_yaml['VERIFY_SSL'])) !=0:
-        VERIFY_SSL = str(config_yaml['VERIFY_SSL'])
-        print("INFO: Setting VERIFY_SSL to", config_yaml['VERIFY_SSL'])
-except:
-    VERIFY_SSL = DEFAULT_VERIFY_SSL
-    print("INFO: Setting default VERIFY_SSL to", DEFAULT_VERIFY_SSL)
 
 ca_certificate = None
 api_instances = {}
@@ -86,6 +66,10 @@ def exit_func(function_name):
 def debug_(data):
     app.logger.debug(data)
 
+def info_(data):
+    print(data)
+    app.logger.info(data)
+
 def error_(data):
     app.logger.error(data)
 ##End logging setup
@@ -95,45 +79,13 @@ app = Flask(__name__)
 # WARNING: Sets CORS for all paths
 CORS(app)
 
-@app.before_first_request
 def before_first_request():
-    init_sdkms_client(API_KEY)
-
-def init_sdkms_client(api_key):
-    parts = api_key.split(':')
-    if len(parts) != 2:
-        print('Invalid API key provided')
-        exit(1)
-    config = sdkms.v1.configuration.Configuration()
-    config.host = API_ENDPOINT
-    config.username = parts[0]
-    config.password = parts[1]
-    config.verify_ssl = VERIFY_SSL
-    config.debug = DEBUG
-    if ca_certificate:
-      config.ssl_ca_cert = ca_certificate
-
-    client = sdkms.v1.ApiClient(configuration=config)
-    client.configuration.debug = cl_args.debug
-
-    auth_instance = sdkms.v1.AuthenticationApi(api_client=client)
-    auth = auth_instance.authorize()
-    print_debug('Auth credentials: {} {}'.format(config.username,
-                                                   config.password))
-    print_debug(auth)
-
-    config.api_key['Authorization'] = auth.access_token
-    config.api_key_prefix['Authorization'] = 'Bearer'
-
-    api_instances['auth'] = auth_instance
-    api_instances['sobjects'] = sdkms.v1.SecurityObjectsApi(
-        api_client=client)
-    api_instances['protect'] = sdkms.v1.EncryptionAndDecryptionApi(
-        api_client=client)
-    api_instances['digest'] = sdkms.v1.DigestApi(
-        api_client=client)
-    api_instances['trust'] = sdkms.v1.SignAndVerifyApi(
-        api_client=client)
+    response_code, error = init_dsma_client(API_ENDPOINT, DSMA_PORT, API_KEY)
+    if response_code != 0:
+        print("ERROR: Connection to DSMA is Down")
+        error_(error)
+        exit_error_process(1)
+    print("INFO: Connection to DSMA is UP")
 
 
 @app.errorhandler(404)
@@ -147,7 +99,6 @@ def illegal_request(error):
 
 @app.route("/helloWorld", methods=['GET'])
 def hello():
-    init_sdkms_client(API_KEY)
     return "HelloWorld, 200"
 
 
@@ -155,12 +106,19 @@ def hello():
 def post_handler():
     try:
         payload, message_type = parse_request(request)
-        debug_(message_type)
+        mt_schema = SCHEMA['paymentsmessage']['definitions'][message_type]
+        required_fields = mt_schema['required']
+        for field in required_fields:
+            debug_(payload[field])
+        transform_enc = mt_schema['transform']["x-encrypted"]
+        transform_sig = mt_schema['transform']["x-signed"]
+        print(transform_enc, transform_sig)
     except KeyError:
         abort(400)
     return 'OK'
 
 
 if __name__ == '__main__':
-    print("Starting App on port", PORT)
+    info_("INFO: Starting App on port {}".format(PORT))
+    before_first_request()
     app.run(host='0.0.0.0', debug=DEBUG, port=PORT)

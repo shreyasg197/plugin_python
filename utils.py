@@ -1,6 +1,12 @@
 #!/usr/bin/python
 import sys
 import yaml
+import requests
+import logging
+import json 
+from requests.exceptions import HTTPError
+
+logger = logging.getLogger(__name__)
 
 def entered_fn(logger, function_name):
     logger.debug("Entered function %s", str(function_name))
@@ -11,8 +17,12 @@ def exit_fn(logger, function_name):
 def debug_mod(logger, data):
     logger.debug(data)
 
+def info__(logger, data):
+    print("INFO: " + data)
+    logger.info(data)
+
 def error__(logger, data):
-    logger.error(data)
+    logger.error("ERROR: " + data)
 
 def load_config_yaml():
     try:        
@@ -20,8 +30,19 @@ def load_config_yaml():
             config_yaml = yaml.safe_load(file)
             return config_yaml
     except Exception as e: 
-        print("ERROR: config.yaml not found", e)
+        error__(logger, "config.yaml not found".format(e))
         exit_error_process(2)
+
+def load_schema_file():
+    try:
+        with open('mt-schema.json', 'r') as file:
+            schema = json.load(file)
+            info__(logger, "Schema loaded successfully")
+            return schema
+    except Exception as e: 
+        print("ERROR: mt-schema.json not found", e)
+        exit_error_process(2)
+
 
 # Check for keys in the yaml
 def validate_config_yaml(config_yaml):
@@ -44,7 +65,12 @@ def validate_config_yaml(config_yaml):
         print("ERROR: ", error)
         exit_error_process(1)
 
-
+def init_dsma_client(api_endpoint, dsma_port, api_key):
+    try:
+        response = requests.get(api_endpoint + ":" + dsma_port)
+    except Exception as error:
+        return -1, error
+    return 0, None
 
     
 # Check if api key is 164 length 
