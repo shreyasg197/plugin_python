@@ -1,8 +1,10 @@
+import json
 import os
 import logging
 from flask_cors import CORS
 from flask import Flask, request, make_response, jsonify, abort
-from utils import exit_error_process, load_schema_file, validate_config_yaml, load_config_yaml,init_dsma_client, load_schema_file
+from utils import exit_error_process, load_schema_file, validate_config_yaml
+from utils import load_config_yaml,init_dsma_client, load_schema_file
 from controllers import parse_request
 
 # Load config.yaml
@@ -18,6 +20,7 @@ DEFAULT_PORT = 5000
 DEFAULT_API_ENDPOINT = 'https://apps.sdkms.fortanix.com'
 API_KEY = config_yaml['API_KEY']
 DSMA_PORT = config_yaml['DSMA_PORT']
+
 try:
     if len(str(config_yaml['PORT'])) !=0 :
         PORT = config_yaml['PORT']
@@ -105,16 +108,34 @@ def hello():
 @app.route("/fortanix", methods=['POST'])
 def post_handler():
     try:
-        payload, message_type = parse_request(request)
+        payload_data, message_type = parse_request(request)
         mt_schema = SCHEMA['paymentsmessage']['definitions'][message_type]
         required_fields = mt_schema['required']
         for field in required_fields:
-            debug_(payload[field])
+            debug_(payload_data[field])
         transform_enc = mt_schema['transform']["x-encrypted"]
         transform_sig = mt_schema['transform']["x-signed"]
-        print(transform_enc, transform_sig)
-    except KeyError:
+        data_to_sign =  None
+        names = []
+        for name, property in mt_schema['properties'].items():
+            raw_field = None
+            if isinstance(payload_data[name], str):
+                raw_field = payload_data[name]
+            else:
+                raw_field = json.dumps(payload_data[name])
+            print('Name: {}, Field: {}, Value: {}'.format(name, property, raw_field))
+
+            if 'x-encrypted' in property.keys():
+                if name not in payload_data.keys():
+                    raise ValueError("Missing encryption field in payload: ()".format(name))
+                
+    except KeyError as e:
+        print("Error: ", e)
         abort(400)
+    except ValueError as e:
+        print("Error: ", e)
+        abort(400)
+
     return 'OK'
 
 

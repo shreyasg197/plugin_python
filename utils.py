@@ -57,6 +57,7 @@ def validate_config_yaml(config_yaml):
             if not "FLASK_LOG_PATH" in config_yaml:
                 raise KeyError("FLASK_LOG_PATH")
         # Validate API KEY from DSM
+        print(config_yaml['AES_256']['encryption'])
         # validate_api_key(config_yaml['API_KEY'])
     except KeyError as error:
         print("ERROR: Key not found in config.yaml", error)
