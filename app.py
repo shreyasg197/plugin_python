@@ -3,7 +3,7 @@ import os
 import logging
 from flask_cors import CORS
 from flask import Flask, request, make_response, jsonify, abort
-from utils import encrypt_request, exit_error_process, load_schema_file, validate_config_yaml, encrypt_fpe_request
+from utils import decrypt_fpe_request, decrypt_request, encrypt_request, exit_error_process, load_schema_file, validate_config_yaml, encrypt_fpe_request
 from utils import load_config_yaml,init_dsma_client, load_schema_file
 from controllers import parse_request
 import base64
@@ -106,6 +106,84 @@ def hello():
     return "HelloWorld, 200"
 
 
+@app.route("/fortanix", methods=['PUT'])
+def put_handler():
+    try:
+        payload_data, message_type = parse_request(request)
+        mt_schema = SCHEMA['paymentsmessage']['definitions'][message_type]
+        required_fields = mt_schema['required']
+        for field in required_fields:
+            debug_(payload_data[field])
+        transform_enc = mt_schema['transform']["x-encrypted"]['format']
+        transform_sig = mt_schema['transform']["x-signed"]['format']
+        data_to_sign =  ""
+        names = []
+        debug_('transform_enc {}'.format(transform_enc))
+        debug_('transform_sig {}'.format(transform_sig))
+        for name, property in mt_schema['properties'].items():
+            raw_field = ""
+            if isinstance(payload_data[name], str):
+                raw_field = payload_data[name]
+            else:
+                raw_field = json.dumps(payload_data[name])
+            debug_('Name: {}, Field: {}, Value: {}'.format(name, property, raw_field))
+
+            if 'x-encrypted' in property.keys():
+                if name not in payload_data.keys():
+                    raise ValueError("Missing encryption field in payload: {}".format(name))
+                encryption_aes_key_name = config_yaml[property["x-encrypted"]['key']]
+                debug_('Using key {}'.format(encryption_aes_key_name))
+                mode = property["x-encrypted"]['mode']
+                if 'mode' not in property["x-encrypted"].keys():
+                    mode =  "CBC"
+               
+                debug_('Using mode {}'.format(mode))
+                if mode != "FPE":
+                    enc_parts = payload_data[name].split('.')
+                    print('enc_parts {}'.format(enc_parts))
+                    print('iv  {}'.format((base64.b64encode(enc_parts[0].encode('ascii')).decode('ascii'))))
+                    payload = json.dumps({
+                        "keyName": encryption_aes_key_name,
+                        "alg": "AES",
+                        "mode": mode,
+                        "cipher": bytes.fromhex(enc_parts[1]).decode('utf-8'),
+                        "iv": bytes.fromhex(enc_parts[0]).decode('utf-8')
+                     })
+                    decResponse = decrypt_request(payload,  API_ENDPOINT +":"+ DSMA_PORT, API_KEY)
+                    print(decResponse)
+                else:
+                    payload = json.dumps({
+                        "keyName": encryption_aes_key_name,
+                        "alg": "AES",
+                        "mode": mode,
+                        "cipher": payload_data[name]
+                    })
+                    decResponse = decrypt_fpe_request(payload,API_ENDPOINT +":"+ DSMA_PORT, API_KEY)
+                    print(decResponse)
+                if transform_enc == 'replace':
+                    if mode == "FPE":
+                        payload_data[name] = decResponse['plain']
+                        print(payload_data[name])
+                    else:
+                        payload_data[name] = base64.b64decode(decResponse['plain']).decode('utf-8')
+                    
+
+                # if transform_enc == 'replace':
+                #     if 'iv' in encResponse.keys(): # non FPE
+                #         payload_data[name] = encResponse['iv'].encode('utf-8').hex() + "." + encResponse['cipher'].encode('utf-8').hex()
+                #     else: # FPE
+                #         payload_data[name] = encResponse['cipher']
+                # else:
+                #     print("TBD alternative to field -> cipher replacement")
+
+        return payload_data
+    except KeyError as e:
+        print("Error: ", e)
+        abort(400)
+    except ValueError as e:
+        print("Error: ", e)
+        abort(400)
+
 @app.route("/fortanix", methods=['POST'])
 def post_handler():
     try:
@@ -115,12 +193,13 @@ def post_handler():
         for field in required_fields:
             debug_(payload_data[field])
         transform_enc = mt_schema['transform']["x-encrypted"]['format']
-        transform_sig = mt_schema['transform']["x-signed"]
-        data_to_sign =  None
+        transform_sig = mt_schema['transform']["x-signed"]['format']
+        data_to_sign =  ""
         names = []
-        debug_("transform_enc", transform_enc)
+        debug_('transform_enc {}'.format(transform_enc))
+        debug_('transform_sig {}'.format(transform_sig))
         for name, property in mt_schema['properties'].items():
-            raw_field = None
+            raw_field = ""
             if isinstance(payload_data[name], str):
                 raw_field = payload_data[name]
             else:
@@ -164,6 +243,13 @@ def post_handler():
                         payload_data[name] = encResponse['cipher']
                 else:
                     print("TBD alternative to field -> cipher replacement")
+
+            if 'x-signed' in property.keys():
+                if name not in payload_data.keys():
+                    raise ValueError("Missing encryption field in payload: {}".format(name))
+                if transform_sig == 'payload' or transform_sig == 'extend' or transform_sig == 'complete':
+                    data_to_sign = data_to_sign + raw_field
+                    debug_('data to sign {}\n'.format(data_to_sign))
         return payload_data
     except KeyError as e:
         print("Error: ", e)
@@ -171,8 +257,6 @@ def post_handler():
     except ValueError as e:
         print("Error: ", e)
         abort(400)
-
-    return 'OK'
 
 
 if __name__ == '__main__':

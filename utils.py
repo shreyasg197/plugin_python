@@ -90,6 +90,20 @@ def encrypt_fpe_request(payload, url, api_key):
     response = requests.post(url, data=payload, headers=headers)
     return response.json()
 
+def decrypt_request(payload, url, api_key):
+    url = url + "/decrypt"
+    print(url, payload)
+    headers={"Content-Type": "application/json", "apiKey": api_key}
+    response = requests.post(url, data=payload, headers=headers)
+    return response.json()
+
+def decrypt_fpe_request(payload, url, api_key):
+    url = url + "/detokenize"
+    print(url, payload)
+    headers={"Content-Type": "application/json", "apiKey": api_key}
+    response = requests.post(url, data=payload, headers=headers)
+    return response.json()
+
 # Check if api key is 164 length 
 def validate_api_key(api_key):
     if len(api_key) != 164:
