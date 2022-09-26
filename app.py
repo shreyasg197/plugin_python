@@ -3,9 +3,10 @@ import os
 import logging
 from flask_cors import CORS
 from flask import Flask, request, make_response, jsonify, abort
-from utils import exit_error_process, load_schema_file, validate_config_yaml
+from utils import encrypt_request, exit_error_process, load_schema_file, validate_config_yaml, encrypt_fpe_request
 from utils import load_config_yaml,init_dsma_client, load_schema_file
 from controllers import parse_request
+import base64
 
 # Load config.yaml
 config_yaml = load_config_yaml()
@@ -113,22 +114,57 @@ def post_handler():
         required_fields = mt_schema['required']
         for field in required_fields:
             debug_(payload_data[field])
-        transform_enc = mt_schema['transform']["x-encrypted"]
+        transform_enc = mt_schema['transform']["x-encrypted"]['format']
         transform_sig = mt_schema['transform']["x-signed"]
         data_to_sign =  None
         names = []
+        debug_("transform_enc", transform_enc)
         for name, property in mt_schema['properties'].items():
             raw_field = None
             if isinstance(payload_data[name], str):
                 raw_field = payload_data[name]
             else:
                 raw_field = json.dumps(payload_data[name])
-            print('Name: {}, Field: {}, Value: {}'.format(name, property, raw_field))
+            debug_('Name: {}, Field: {}, Value: {}'.format(name, property, raw_field))
 
             if 'x-encrypted' in property.keys():
                 if name not in payload_data.keys():
-                    raise ValueError("Missing encryption field in payload: ()".format(name))
-                
+                    raise ValueError("Missing encryption field in payload: {}".format(name))
+                encryption_aes_key_name = config_yaml[property["x-encrypted"]['key']]
+                debug_('Using key {}'.format(encryption_aes_key_name))
+                mode = property["x-encrypted"]['mode']
+                if 'mode' not in property["x-encrypted"].keys():
+                    mode =  "CBC"
+                message_bytes = payload_data[name].encode('ascii')
+                base64_bytes = base64.b64encode(message_bytes)
+                base64_message = base64_bytes.decode('ascii')
+                debug_('raw message {} b64 {}'.format(payload_data[name], base64_message))
+                debug_('Using mode {}'.format(mode))
+                if mode == "FPE":
+                    payload = json.dumps({
+                        "keyName": encryption_aes_key_name,
+                        "alg": "AES",
+                        "mode": mode,
+                        "plain": payload_data[name]
+                     })
+                    encResponse = encrypt_fpe_request(payload, API_ENDPOINT +":"+ DSMA_PORT, API_KEY)
+                else:
+                    payload = json.dumps({
+                        "keyName": encryption_aes_key_name,
+                        "alg": "AES",
+                        "mode": mode,
+                        "plain": base64_message
+                     })
+                    encResponse = encrypt_request(payload, API_ENDPOINT +":"+ DSMA_PORT, API_KEY)
+
+                if transform_enc == 'replace':
+                    if 'iv' in encResponse.keys(): # non FPE
+                        payload_data[name] = encResponse['iv'].encode('utf-8').hex() + "." + encResponse['cipher'].encode('utf-8').hex()
+                    else: # FPE
+                        payload_data[name] = encResponse['cipher']
+                else:
+                    print("TBD alternative to field -> cipher replacement")
+        return payload_data
     except KeyError as e:
         print("Error: ", e)
         abort(400)

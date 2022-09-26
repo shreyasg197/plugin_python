@@ -4,6 +4,7 @@ import yaml
 import requests
 import logging
 import json 
+import base64
 from requests.exceptions import HTTPError
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,6 @@ def validate_config_yaml(config_yaml):
             if not "FLASK_LOG_PATH" in config_yaml:
                 raise KeyError("FLASK_LOG_PATH")
         # Validate API KEY from DSM
-        print(config_yaml['AES_256']['encryption'])
         # validate_api_key(config_yaml['API_KEY'])
     except KeyError as error:
         print("ERROR: Key not found in config.yaml", error)
@@ -73,7 +73,23 @@ def init_dsma_client(api_endpoint, dsma_port, api_key):
         return -1, error
     return 0, None
 
-    
+def encrypt_request(payload, url, api_key):
+    if "FPE" in payload:
+        url = url + "/tokenize"
+    else:
+        url = url + "/encrypt"
+    print(url, payload)
+    headers={"Content-Type": "application/json", "apiKey": api_key}
+    response = requests.post(url, data=payload, headers=headers)
+    return response.json()
+
+def encrypt_fpe_request(payload, url, api_key):
+    url = url + "/tokenize"
+    print(url, payload)
+    headers={"Content-Type": "application/json", "apiKey": api_key}
+    response = requests.post(url, data=payload, headers=headers)
+    return response.json()
+
 # Check if api key is 164 length 
 def validate_api_key(api_key):
     if len(api_key) != 164:
