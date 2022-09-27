@@ -143,7 +143,7 @@ def put_handler():
                         payload_data[name] = base64.b64decode(decResponse['plain']).decode('utf-8')
 
                 #  Pending sign logic
-        return { 'result': base64.b64encode(json.dumps(payload_data).encode()).decode()}
+        return { 'result': base64.b64encode(json.dumps(payload_data).encode()).decode()}        
     except KeyError as e:
         error_(logger,e)
         abort(400)
@@ -225,7 +225,7 @@ def post_handler():
                     debug_(logger,'data to sign {}\n'.format(data_to_sign))
                     #  Pending sign logic
                 
-        return payload_data
+        return { 'result': base64.b64encode(json.dumps(payload_data).encode()).decode()}
     except KeyError as e:
         error_(logger,e)
         abort(400)
