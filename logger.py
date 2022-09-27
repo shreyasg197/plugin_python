@@ -14,8 +14,8 @@ def logger_init(config_yaml):
     filename = "flask.log"
 
     ## get logger
-    #logger = logging.getLogger(__name__) ## this was my mistake, to init a module logger here
     logger = logging.getLogger() ## root logger
+
     if DEBUG:
         logger.setLevel(logging.DEBUG)
         print('\nLog level set to DEBUG')
@@ -35,7 +35,6 @@ def logger_init(config_yaml):
 
     # Stream handler
     stream = logging.StreamHandler()
-    #streamformat = logging.Formatter("%(asctime)s [%(levelname)s:%(module)s] %(message)s")
     streamformat = logging.Formatter("%(asctime)s [%(levelname)s]: %(name)s: %(message)s")
     if DEBUG:
         logger.setLevel(logging.DEBUG)
@@ -47,19 +46,3 @@ def logger_init(config_yaml):
     # Adding all handlers to the logs
     logger.addHandler(file)
     logger.addHandler(stream)
-
-
-def logger_cleanup(path, days_to_keep):
-    lclogger = logging.getLogger(__name__)
-    logpath = f"{path}"
-    now = time.time()
-    for filename in os.listdir(logpath):
-        filestamp = os.stat(os.path.join(logpath, filename)).st_mtime
-        filecompare = now - days_to_keep * 86400
-        if  filestamp < filecompare:
-            lclogger.info("Delete old log " + filename)
-            try:
-                os.remove(os.path.join(logpath, filename))
-            except Exception as e:
-                lclogger.exception(e)
-                continue

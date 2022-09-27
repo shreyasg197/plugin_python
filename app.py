@@ -43,17 +43,15 @@ except:
     error_(logger, 'Missing endpoint for DSMA')
     exit_error_process(1)
 
-api_instances = {}
-keyPair = None
-pubKey  = None
-## END GLOBALS ##
-
 
 app = Flask(__name__)
+## END GLOBALS ##
 
 # WARNING: Sets CORS for all paths
 CORS(app)
 
+# Check if DSMA is up before handling first request
+# TODO: periodic DSMA upcheck
 def before_first_request():
     response_code, error = init_dsma_client(API_ENDPOINT, DSMA_PORT, API_KEY)
     if response_code != 0:
@@ -62,24 +60,27 @@ def before_first_request():
         exit_error_process(1)
     info_(logger, "INFO: Connection to DSMA is UP")
 
-
+# Modify the 404 error message, currently not returning error to user
 @app.errorhandler(404)
 def not_found_error(error):
     return make_response(jsonify({'ERROR': 'Resource not found'}), 404)
 
+# Modify the 400 error message, currently not returning error to user
 @app.errorhandler(400)
 def illegal_request(error):
     return make_response(jsonify({'ERROR': 'Client issued a malformed or illegal request'}), 400)
 
+# Modify the 500 error message, currently not returning error to user
 @app.errorhandler(500)
 def server_error(error):
     return make_response(jsonify({'ERROR': 'Internal server error'}), 500)
 
+# Helloworld check route
 @app.route("/helloWorld", methods=['GET'])
 def hello():
     return "HelloWorld, 200"
 
-
+# 'Reveal' route using 'PUT'
 @app.route("/fortanix", methods=['PUT'])
 def put_handler():
     try:
@@ -144,15 +145,17 @@ def put_handler():
                 #  Pending sign logic
         return { 'result': base64.b64encode(json.dumps(payload_data).encode()).decode()}
     except KeyError as e:
-        print("Error: ", e)
+        error_(logger,e)
         abort(400)
     except ValueError as e:
-        print("Error: ", e)
+        error_(logger,e)
         abort(400)
     except requests.ConnectionError as e:
+        # Failure to make connections to DSMA
         error_(logger, "Unable to connect to DSMA")
         abort(500)
 
+# 'Protect' route using 'POST'
 @app.route("/fortanix", methods=['POST'])
 def post_handler():
     try:
@@ -224,17 +227,17 @@ def post_handler():
                 
         return payload_data
     except KeyError as e:
-        print("Error: ", e)
+        error_(logger,e)
         abort(400)
     except ValueError as e:
-        print("Error: ", e)
+        error_(logger,e)
         abort(400)
     except requests.ConnectionError as e:
-        print("Unable to connect to DSMA")
+        error_(logger, "Unable to connect to DSMA")
         abort(500)
 
 
 if __name__ == '__main__':
-    info_(logger,"Starting app")
+    info_(logger,'Starting App on {}'.format(PORT))
     before_first_request()
     app.run(host='0.0.0.0', debug=DEBUG, port=PORT)
