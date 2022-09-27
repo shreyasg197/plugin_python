@@ -3,4 +3,3 @@ flask-cors
 pyyaml
 sdkms
 requests
-cbor2
