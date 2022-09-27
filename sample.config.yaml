@@ -6,4 +6,5 @@ FLASK_LOG_PATH : "/tmp/flask.log"
 API_ENDPOINT : "https://apps.sdkms.fortanix.com"
 API_KEY : ""
 AES_256 : 
-  encryption : "aes_encrypted"
+AES-256 : ""
+TOK-NUM8-256: ""
